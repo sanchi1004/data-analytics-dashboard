@@ -15,9 +15,8 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const client = new GoogleGenerativeAI({
-  apiKey,
-});
+// Initialize Google Gemini AI client correctly
+const genAI = new GoogleGenerativeAI(apiKey);
 
 // Compose prompt for Gemini (update as required to suit your needs)
 function composePrompt(company, fromDate, toDate) {
@@ -35,6 +34,7 @@ Please output JSON in this format ONLY:
 }`;
 }
 
+// Parse Gemini's JSON response safely
 function parseGeminiResponse(text) {
   try {
     const jsonStart = text.indexOf("{");
@@ -58,14 +58,16 @@ app.get("/api/analytics", async (req, res) => {
   const prompt = composePrompt(company, from, to);
 
   try {
-    const model = client.getModel("models/text-bison-001");
-    const response = await model.generateText({
-      prompt: { text: prompt },
-      temperature: 0.3,
-      maxOutputTokens: 800,
-    });
+    // Correct way to get Gemini generative model and generate content
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const outputText = response?.candidates?.[0]?.content || response?.text || "";
+    const result = await model.generateContent(prompt);
+
+    // Extracting the AI-generated text from response
+    const outputText =
+      result.response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      result.response?.candidates?.[0]?.content?.text ||
+      "";
 
     const analyticsData = parseGeminiResponse(outputText);
 
@@ -79,7 +81,10 @@ app.get("/api/analytics", async (req, res) => {
     res.json(analyticsData);
   } catch (err) {
     console.error("Error fetching Gemini analytics:", err);
-    res.status(500).json({ error: "Failed to fetch data from Gemini API." });
+    res.status(500).json({
+      error: "Failed to fetch data from Gemini API.",
+      details: err.message || err,
+    });
   }
 });
 
